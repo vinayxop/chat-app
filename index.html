@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Chat with Usernames</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        #chat-container { max-width: 800px; margin: 0 auto; display: flex; }
+        #chat-area { flex-grow: 1; }
+        #user-area { width: 200px; margin-left: 20px; }
+        #messages { list-style-type: none; margin: 0; padding: 0; height: 400px; overflow-y: auto; border: 1px solid #ddd; }
+        #messages li { padding: 8px 10px; }
+        #messages li.message { border-left: 3px solid #4CAF50; }
+        #messages li.notification { color: #666; font-style: italic; }
+        .message-username { font-weight: bold; color: #2c3e50; }
+        .message-time { color: #7f8c8d; font-size: 0.8em; margin-left: 5px; }
+        #message-form { display: flex; margin-top: 10px; }
+        #message-input { flex-grow: 1; padding: 8px; }
+        #send-button { padding: 8px 15px; margin-left: 10px; }
+        #username-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; }
+        #username-form { background: white; padding: 20px; border-radius: 5px; }
+        #user-list { list-style-type: none; padding: 0; border: 1px solid #ddd; height: 400px; overflow-y: auto; }
+        #user-list li { padding: 8px 10px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div id="username-modal">
+        <div id="username-form">
+            <h2>Enter your username</h2>
+            <input type="text" id="username-input" placeholder="Your username" autofocus>
+            <button id="username-submit">Join Chat</button>
+        </div>
+    </div>
+
+    <div id="chat-container" style="display:none">
+        <div id="chat-area">
+            <ul id="messages"></ul>
+            <form id="message-form">
+                <input type="text" id="message-input" autocomplete="off" placeholder="Type your message..." disabled>
+                <button id="send-button" disabled>Send</button>
+            </form>
+        </div>
+        <div id="user-area">
+            <h3>Online Users</h3>
+            <ul id="user-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUsername = '';
+        
+        // Handle username submission
+        document.getElementById('username-submit').addEventListener('click', function() {
+            const username = document.getElementById('username-input').value.trim();
+            if (username) {
+                currentUsername = username;
+                socket.emit('set_username', username);
+                document.getElementById('username-modal').style.display = 'none';
+                document.getElementById('chat-container').style.display = 'flex';
+                document.getElementById('message-input').disabled = false;
+                document.getElementById('send-button').disabled = false;
+                document.getElementById('message-input').focus();
+            }
+        });
+
+        // Handle form submission
+        document.getElementById('message-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const input = document.getElementById('message-input');
+            if (input.value) {
+                socket.emit('chat_message', input.value);
+                input.value = '';
+            }
+        });
+
+        // Handle incoming messages
+        socket.on('message', function(data) {
+            const li = document.createElement('li');
+            
+            if (data.type === 'notification') {
+                li.className = 'notification';
+                li.textContent = data.data;
+            } else {
+                li.className = 'message';
+                const usernameSpan = document.createElement('span');
+                usernameSpan.className = 'message-username';
+                usernameSpan.textContent = data.username;
+                
+                const timeSpan = document.createElement('span');
+                timeSpan.className = 'message-time';
+                timeSpan.textContent = data.timestamp;
+                
+                li.appendChild(usernameSpan);
+                li.appendChild(timeSpan);
+                li.appendChild(document.createTextNode(': ' + data.data));
+            }
+            
+            document.getElementById('messages').appendChild(li);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        });
+
+        // Update user list
+        socket.on('user_list', function(data) {
+            const userList = document.getElementById('user-list');
+            userList.innerHTML = '';
+            data.users.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = user;
+                if (user === currentUsername) {
+                    li.style.fontWeight = 'bold';
+                }
+                userList.appendChild(li);
+            });
+        });
+    </script>
+</body>
+</html>
